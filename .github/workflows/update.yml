@@ -1,11 +1,18 @@
 name: Update macro bias
 
-# Weekdays, UTC. ~05:17 (before London), ~13:47 (after 08:30 ET US releases), ~21:17 (after US close).
-# GitHub may start scheduled runs a few minutes late. "Run workflow" = manual refresh.
+# Weekdays. GitHub cron is UTC and ignores daylight saving, so each window is scheduled for both
+# CEST (UTC+2, summer) and CET (UTC+1, winter) Bratislava time. GitHub may start runs 5-15 min late.
+#  - before London open 09:00 Bratislava:  05:52 + 06:52 UTC  -> summer 07:52/08:52, winter 06:52/07:52
+#  - ECB daily data around midday:         11:17 UTC
+#  - US releases (08:30 ET = 14:30 Bratislava) through NY open 15:30: every 15 min 12:07-13:52 UTC
+#      -> summer 14:07-15:52, winter 13:07-14:52 Bratislava
+#  - after US close (FRED/Treasury end-of-day): 21:17 UTC
+# "Run workflow" = manual refresh.
 on:
   schedule:
-    - cron: "17 5 * * 1-5"
-    - cron: "47 13 * * 1-5"
+    - cron: "52 5,6 * * 1-5"
+    - cron: "17 11 * * 1-5"
+    - cron: "7,22,37,52 12,13 * * 1-5"
     - cron: "17 21 * * 1-5"
   workflow_dispatch:
   push:

@@ -7,7 +7,16 @@ Deterministické makro skóre od **−10 do +10** pre **NQ**, **Zlato (GC/XAU)**
 
 ## Webová verzia (GitHub Pages, zadarmo)
 
-GitHub Actions spúšťa `.github/workflows/update.yml` v pracovné dni 3× denne (UTC 05:17, 13:47 a 21:17; GitHub môže štart o pár minút oneskoriť). Workflow:
+GitHub Actions spúšťa `.github/workflows/update.yml` v pracovné dni podľa obchodných session (čas Bratislava, GitHub môže štart o 5–15 min oneskoriť):
+
+- pred London open 09:00: 2 behy ráno,
+- okolo poludnia: denné dáta ECB,
+- od 14:00 do NY open 15:30: každých 15 min, pretože dáta z USA (CPI, NFP…) vychádzajú o 14:30,
+- večer po zatvorení USA.
+
+Častejšie spúšťanie nedáva zmysel: bezplatné zdroje sú denné alebo mesačné. Výnosy z FRED meškajú 1–2 pracovné dni.
+
+Workflow:
 
 1. spustí testy,
 2. stiahne dáta z FRED a ECB,

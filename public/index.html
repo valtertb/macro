@@ -102,6 +102,21 @@ async function api(path, opts) {
   const r = await fetch(url, opts); if (!r.ok) throw new Error(path + " → " + r.status); return r.json();
 }
 
+// Must match the cron schedule in .github/workflows/update.yml (UTC, Mon-Fri).
+const RUNS_UTC = [[5,52],[6,52],[11,17],[12,7],[12,22],[12,37],[12,52],[13,7],[13,22],[13,37],[13,52],[21,17]];
+function nextRunText() {
+  const now = new Date();
+  for (let d = 0; d < 8; d++) {
+    const day = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + d));
+    const wd = day.getUTCDay(); if (wd === 0 || wd === 6) continue;
+    for (const [hh, mm] of RUNS_UTC) {
+      const t = new Date(day.getTime() + (hh * 60 + mm) * 60000);
+      if (t > now) return "~" + t.toLocaleString("sk-SK", { timeZone: "Europe/Bratislava", weekday: d ? "short" : undefined, hour: "2-digit", minute: "2-digit" }) + " (GitHub môže meškať 5–15 min)";
+    }
+  }
+  return "—";
+}
+
 function latestInputDate(b) { let d = null; for (const f of b.factors) for (const i of f.inputs) if (!d || i.date > d) d = i.date; return d; }
 
 function renderCards() {
@@ -194,7 +209,7 @@ async function load() {
     h("span", {}, "USA: ", h("b", {}, usSession())),
     h("span", {}, "Posledný refresh dát: ", h("b", {}, fmtLocal(cache.lastRefreshAt))),
     h("span", {}, "Režim dát: ", h("b", {}, "denné/mesačné, nie real-time")),
-    STATIC ? h("span", {}, "Automatická aktualizácia: ", h("b", {}, "pracovné dni 3× (ráno, po vydaní dát z USA, večer)")) : null);
+    STATIC ? h("span", {}, "Ďalšia automatická aktualizácia: ", h("b", {}, nextRunText())) : null);
   const bn = document.getElementById("banners"); bn.replaceChildren();
   if (!cache.fredConfigured) bn.append(h("div", { class: "banner" }, STATIC
     ? "Chýba FRED_API_KEY v GitHub Secrets: dáta z USA sa nenačítajú, skóre bude „Nedostatok dát“."
