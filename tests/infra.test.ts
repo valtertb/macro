@@ -102,6 +102,28 @@ test("full refresh with fake providers: scores stored once per input change; fai
   assert.ok(factors.n >= 15);
 });
 
+test("alternative refs: newest code wins, no splicing, unavailable codes tolerated", async () => {
+  const db = openDb(":memory:");
+  const old = synthetic.EA_HICP_CORE.slice(0, -10); // stops earlier
+  const fresh = synthetic.EA_HICP_CORE.map((o) => ({ ...o, value: o.value + 0.01 }));
+  const deps: IngestDeps = {
+    ...fakeDeps,
+    fetchEcb: async (def) => {
+      if (def.ref.startsWith("ICP/")) return old;
+      if (def.ref === "HICP/M.U2.N.XEF000.4F0.ANR") return fresh;
+      if (def.code === "EA_HICP_CORE") throw new Error("HTTP 404");
+      if (!synthetic[def.code]) throw new Error("n/a");
+      return synthetic[def.code];
+    },
+  };
+  const r = await refreshAll(db, { FRED_API_KEY: "k" }, { now: NOW, deps });
+  assert.ok(r.ingest.ok.includes("EA_HICP_CORE"));
+  const s = getSeries(db, "EA_HICP_CORE");
+  assert.equal(s.length, fresh.length);
+  assert.equal(s.at(-1)!.value, fresh.at(-1)!.value);
+  assert.equal((db.prepare("SELECT value FROM meta WHERE key='ref:EA_HICP_CORE'").get() as any).value, "HICP/M.U2.N.XEF000.4F0.ANR");
+});
+
 test("server: endpoints, validation, host guard, CSRF-style header on refresh", async () => {
   const db = openDb(":memory:");
   const srv = createServer();

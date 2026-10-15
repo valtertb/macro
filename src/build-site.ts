@@ -11,6 +11,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { INDICATORS_BY_CODE, MODEL_VERSION, SYMBOLS, SYMBOL_NAMES } from "./config.ts";
 import { openDb, upcomingCalendar } from "./db.ts";
+import { fetchText } from "./http.ts";
 import { ingestAll } from "./ingest.ts";
 import type { IngestDeps } from "./ingest.ts";
 import { loadData } from "./refresh.ts";
@@ -105,6 +106,21 @@ export async function buildSite(opts: {
     events: db.prepare("SELECT severity, component, message, occurred_at FROM system_events ORDER BY id DESC LIMIT 20").all(),
   });
   write("calendar.json", { generatedAt, events: upcomingCalendar(db, generatedAt.slice(0, 10), 30) });
+
+  // Diagnostics: if euro-area core inflation is not current, publish the list of available HICP annual-rate codes
+  // so the right series key can be identified (no effect on scoring).
+  const hicpState = indicatorStatus(db, now).find((i) => i.code === "EA_HICP_CORE")?.state;
+  if (hicpState !== "ok" && !opts.deps) {
+    try {
+      const csv = await fetchText("https://data-api.ecb.europa.eu/service/data/HICP/M.U2.N..ANR?format=csvdata&lastNObservations=1", { retries: 1 });
+      const lines = csv.split(/\r?\n/).filter(Boolean);
+      const hdr = lines[0].split(",");
+      const ki = hdr.indexOf("KEY"), ti = hdr.indexOf("TIME_PERIOD"), vi = hdr.indexOf("OBS_VALUE"), ni = hdr.indexOf("TITLE");
+      write("diag-ecb.json", { generatedAt, rows: lines.slice(1).map((l) => { const c = l.split(","); return { key: c[ki], period: c[ti], value: c[vi], title: ni >= 0 ? c[ni] : undefined }; }) });
+    } catch (e) {
+      write("diag-ecb.json", { generatedAt, error: e instanceof Error ? e.message : String(e) });
+    }
+  }
 
   const repo = opts.env.GITHUB_REPOSITORY ?? "";
   const html = readFileSync(join(ROOT, "public", "index.html"), "utf8").replace(

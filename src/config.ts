@@ -32,6 +32,8 @@ export interface IndicatorDef {
   note?: string;
   /** Third-party copyrighted series on FRED: used for scoring, but raw values are never published on the public site. */
   restricted?: boolean;
+  /** Alternative refs for the SAME concept (e.g. after a provider renamed a dataset). The ref with the most recent data wins; series are never spliced. */
+  altRefs?: string[];
 }
 
 const D = { staleDays: 5, expireDays: 14 };
@@ -52,7 +54,7 @@ export const INDICATORS: IndicatorDef[] = [
   // ---- ECB (eurozone) — kľúče ešte neboli overené živým volaním; pozri `npm run check-sources` ----
   { code: "EA2Y", name: "Eurozóna 2Y výnos (AAA krivka ECB)", unit: "%", frequency: "daily", provider: "ECB", ref: "YC/B.U2.EUR.4F.G_N_A.SV_C_YM.SR_2Y", ...D, quality: 0.7, historyStart: "2016-01-01", scoring: true, note: "Proxy: AAA krivka eurozóny, NIE nemecký Bund." },
   { code: "EA10Y", name: "Eurozóna 10Y výnos (AAA krivka ECB)", unit: "%", frequency: "daily", provider: "ECB", ref: "YC/B.U2.EUR.4F.G_N_A.SV_C_YM.SR_10Y", ...D, quality: 0.7, historyStart: "2016-01-01", scoring: true, note: "Proxy: AAA krivka eurozóny, NIE nemecký Bund." },
-  { code: "EA_HICP_CORE", name: "Eurozóna core HICP (r/r)", unit: "%", frequency: "monthly", provider: "ECB", ref: "ICP/M.U2.N.XEF000.4.ANR", ...M, expireDays: 100, quality: 1, historyStart: "2010-01-01", scoring: true },
+  { code: "EA_HICP_CORE", name: "Eurozóna core HICP (r/r)", unit: "%", frequency: "monthly", provider: "ECB", ref: "ICP/M.U2.N.XEF000.4.ANR", altRefs: ["HICP/M.U2.N.XEF000.4D0.ANR", "HICP/M.U2.N.XEF000.4F0.ANR", "HICP/M.U2.N.XEF000.4.ANR"], ...M, expireDays: 100, quality: 1, historyStart: "2010-01-01", scoring: true, note: "ECB v 2026 presunula HICP do nového datasetu; použije sa kód s najnovšími dátami." },
   { code: "EA_DFR", name: "ECB depozitná sadzba", unit: "%", frequency: "daily", provider: "ECB", ref: "FM/D.U2.EUR.4F.KR.DFR.LEV", ...D, expireDays: 400, quality: 1, historyStart: "2016-01-01", scoring: false, note: "Iba kontext (sadzba sa mení zriedka)." },
   { code: "EURUSD_REF", name: "EUR/USD referenčný kurz ECB", unit: "USD", frequency: "daily", provider: "ECB", ref: "EXR/D.USD.EUR.SP00.A", ...D, quality: 1, historyStart: "2016-01-01", scoring: false, note: "Iba kontext; do skóre nevstupuje (vyhýbame sa cirkularite)." },
   // ---- Derived ----

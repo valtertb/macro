@@ -1,6 +1,6 @@
 import { INDICATORS, STATIC_CALENDAR, WATCHED_RELEASES } from "./config.ts";
 import type { IndicatorDef } from "./config.ts";
-import { lastObsDate, logEvent, replaceCalendar, setIndicatorStatus, setProviderStatus, upsertObservations } from "./db.ts";
+import { getMeta, lastObsDate, logEvent, setMeta, replaceCalendar, setIndicatorStatus, setProviderStatus, upsertObservations } from "./db.ts";
 import type { Db } from "./db.ts";
 import { redact } from "./http.ts";
 import { fetchEcbSeries } from "./providers/ecb.ts";
@@ -50,8 +50,33 @@ export async function ingestAll(db: Db, env: Record<string, string | undefined>,
       continue;
     }
     try {
-      const start = startFor(db, def);
-      const obs = def.provider === "FRED" ? await fred(def.ref, key as string, start) : await ecb(def, start);
+      let obs: Obs[];
+      if (def.altRefs?.length) {
+        // Same concept published under several codes: take the one with the most recent data, never splice.
+        const tried: { ref: string; obs: Obs[] }[] = [];
+        const errors: string[] = [];
+        for (const ref of [def.ref, ...def.altRefs]) {
+          try {
+            const o = def.provider === "FRED" ? await fred(ref, key as string, def.historyStart) : await ecb({ ...def, ref }, def.historyStart);
+            if (o.length) tried.push({ ref, obs: o });
+          } catch (e) {
+            errors.push(`${ref}: ${redact(e instanceof Error ? e.message : String(e))}`);
+          }
+        }
+        if (!tried.length) throw new Error(`Žiadny kód nevrátil dáta (${errors.join("; ")})`);
+        tried.sort((a, b) => b.obs[b.obs.length - 1].date.localeCompare(a.obs[a.obs.length - 1].date));
+        const best = tried[0];
+        const prevRef = getMeta(db, `ref:${def.code}`);
+        if (prevRef !== best.ref) {
+          db.prepare("DELETE FROM observations WHERE indicator = ?").run(def.code);
+          setMeta(db, `ref:${def.code}`, best.ref);
+          logEvent(db, "info", "ingest", `${def.code}: používa sa kód ${best.ref} (posledný údaj ${best.obs[best.obs.length - 1].date})`, at);
+        }
+        obs = best.obs;
+      } else {
+        const start = startFor(db, def);
+        obs = def.provider === "FRED" ? await fred(def.ref, key as string, start) : await ecb(def, start);
+      }
       if (!obs.length && !lastObsDate(db, def.code)) throw new Error("Zdroj nevrátil žiadne pozorovania");
       const r = upsertObservations(db, def.code, def.provider, obs, at);
       setIndicatorStatus(db, def.code, at, null);
