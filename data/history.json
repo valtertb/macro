@@ -8,6 +8,15 @@
    "status": "insufficient",
    "input_hash": "c77ea47484991a45766e9f0c6013fea6cea7d12d",
    "version": "mvp-0.1.0"
+  },
+  {
+   "calculated_at": "2026-10-15T10:13:56.969Z",
+   "displayed_score": -2.2,
+   "classification": "neutral",
+   "confidence": 89,
+   "status": "normal",
+   "input_hash": "85f676b1fc5eae6effa99315d27b121f6fa60998",
+   "version": "mvp-0.1.0"
   }
  ],
  "GC": [
@@ -19,6 +28,15 @@
    "status": "insufficient",
    "input_hash": "a72bb9d7bf9a9438cce75e06f94a4e2b3813ca8f",
    "version": "mvp-0.1.0"
+  },
+  {
+   "calculated_at": "2026-10-15T10:13:56.969Z",
+   "displayed_score": -1.7,
+   "classification": "neutral",
+   "confidence": 91,
+   "status": "normal",
+   "input_hash": "8f391f8eac19b6d514dfb63854ed7e8193ffe836",
+   "version": "mvp-0.1.0"
   }
  ],
  "EURUSD": [
@@ -29,6 +47,15 @@
    "confidence": null,
    "status": "insufficient",
    "input_hash": "90eadedb0ea079d915ad6b4c723c789857863bea",
+   "version": "mvp-0.1.0"
+  },
+  {
+   "calculated_at": "2026-10-15T10:13:56.969Z",
+   "displayed_score": 0.3,
+   "classification": "neutral",
+   "confidence": 57,
+   "status": "provisional",
+   "input_hash": "434da27fa63c1c8e85ffe7de8b5e02e57e0ff8e9",
    "version": "mvp-0.1.0"
   }
  ]
