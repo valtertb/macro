@@ -46,6 +46,22 @@
   .meter { position:relative; height:10px; min-width:110px; background:#0f141a; border-radius:3px; }
   .meter .zone { position:absolute; top:0; bottom:0; background:#2a2110; }
   .meter .dot { position:absolute; top:-2px; width:4px; height:14px; border-radius:2px; background:var(--text); transform:translateX(-2px); }
+  .sess { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin:8px 0 4px; }
+  @media (max-width:700px) { .sess { grid-template-columns:minmax(0,1fr); } }
+  .sess .panel { min-width:0; }
+  .sess-h { display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:6px; }
+  .sess-h b { font-size:15px; letter-spacing:.04em; }
+  .mk { border-top:1px solid var(--line); padding:10px 0 4px; }
+  .mk:first-of-type { border-top:0; }
+  .mk-top { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 12px; }
+  .verdict { font-size:26px; font-weight:800; letter-spacing:.03em; }
+  .mk-name { font-weight:600; }
+  .pips { display:inline-flex; gap:3px; vertical-align:middle; }
+  .pips i { width:14px; height:6px; border-radius:2px; background:#21262d; display:inline-block; }
+  .pips i.on { background:currentColor; }
+  .mk p { margin:4px 0; font-size:13px; }
+  .warn-list { margin:4px 0 0; padding-left:18px; color:var(--warn); font-size:12.5px; }
+  .warn-list li { margin:2px 0; }
   .cotnote { margin-top:8px; }
   #cot th, #cot td:not(:last-child) { white-space:nowrap; }
   #cot td:last-child { min-width:260px; }
@@ -60,6 +76,8 @@
   </header>
   <div class="meta" id="meta"></div>
   <div id="banners"></div>
+  <h2>Dnešný session bias</h2>
+  <div class="sess" id="session"></div>
   <div class="cards" id="cards"></div>
   <h2>COT: pozície veľkých hráčov (CFTC, týždenne)</h2>
   <div class="panel scroll" id="cot"></div>
@@ -233,6 +251,36 @@ function renderCot() {
     h("p", { class: "small cotnote" }, "Špekulanti = non-commercial (fondy, CTA), komerční = hedgeri. COT index ukazuje, kde je dnešná čistá pozícia medzi minimom (0) a maximom (100) za posledné 3 roky. Pozície sú k utorku, CFTC ich zverejňuje v piatok o 21:30 nášho času. Iba kontext, do makro skóre nevstupuje. Zdroj: " + cotData.source + "."));
 }
 
+
+const DIRCLS = { long: "bull", short: "bear", none: "neu" };
+const STRN = { none: 0, lean: 1, bias: 2, strong: 3 };
+function renderSession() {
+  const box = document.getElementById("session"); box.replaceChildren();
+  const S = cache && cache.session;
+  if (!S) { box.append(h("div", { class: "panel small" }, "Session bias zatiaľ nie je k dispozícii.")); return; }
+  if (S.weekend) box.append(h("div", { class: "banner" }, "Víkend: trhy sú zatvorené. Bias na pondelok sa prepočíta pri rannej aktualizácii pred London open."));
+  for (const blk of S.sessions) {
+    const evs = blk.events.length
+      ? h("ul", { class: "warn-list", style: "color:var(--mute)" }, blk.events.map(e => h("li", {}, e.time + " " + e.name + (e.when === "before" ? " (pred otvorením)" : e.when === "during" ? " (počas session)" : ""))))
+      : h("div", { class: "small" }, "Dnes žiadne zásadné dáta ani zasadnutie centrálnej banky.");
+    box.append(h("div", { class: "panel" },
+      h("div", { class: "sess-h" }, h("b", {}, blk.title + " " + blk.openLocal), h("span", { class: "small" }, S.date + " · dáta k " + (S.dataAsOf || "—"))),
+      blk.markets.map(m => h("div", { class: "mk" },
+        h("div", { class: "mk-top" },
+          h("span", { class: "mk-name" }, m.name),
+          h("span", { class: "verdict " + DIRCLS[m.direction] }, m.verdict),
+          h("span", { class: "pips " + DIRCLS[m.direction], title: m.headline }, [1, 2, 3].map(i => h("i", { class: STRN[m.strength] >= i ? "on" : "" }))),
+          h("span", { class: "small" }, m.headline + " · skóre " + (m.score == null ? "—" : sg(m.score)) + " · istota " + (m.confidence ?? "—"))),
+        h("p", {}, m.reason),
+        h("p", { class: "small" }, h("b", {}, "Ako s tým obchodovať: "), m.playbook),
+        m.invalidation ? h("p", { class: "small" }, h("b", {}, "Zneplatnenie: "), m.invalidation) : null,
+        (m.warnings.length || m.downgrades.length) ? h("ul", { class: "warn-list" }, [...m.downgrades, ...m.warnings].map(w => h("li", {}, w))) : null)),
+      h("div", { style: "margin-top:6px" }, h("span", { class: "small" }, "Dnešné udalosti:"), evs)));
+  }
+  box.append(h("p", { class: "small", style: "grid-column:1/-1;margin:0" },
+    "Pravidlá: |skóre| < " + S.rules.noBias + " = bez biasu, do " + S.rules.bias + " = mierny, do " + S.rules.strong + " = bias, nad = silný. Istota pod " + S.rules.minConfidence + " alebo provizórne skóre = o stupeň slabšie. Makro bias je filter pre tvoje setupy, nie vstupný signál."));
+}
+
 async function renderSides() {
   const [cal, src] = await Promise.all([api("/api/calendar/upcoming"), api("/api/providers/status")]);
   const c = document.getElementById("calendar"); c.replaceChildren();
@@ -266,7 +314,7 @@ async function load() {
     if (hrs > 30) bn.append(h("div", { class: "banner" }, "Stránka nebola aktualizovaná " + Math.floor(hrs) + " hodín. Automatická aktualizácia mohla zlyhať — skontroluj GitHub Actions."));
   }
   try { cotData = await api("/api/cot"); } catch (e) { cotData = { markets: [], errors: [{ symbol: "COT", error: e.message }] }; }
-  renderCards(); renderCot(); await renderDetail(); await renderSides();
+  renderSession(); renderCards(); renderCot(); await renderDetail(); await renderSides();
 }
 
 if (STATIC) {

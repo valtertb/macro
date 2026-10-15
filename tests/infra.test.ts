@@ -130,7 +130,7 @@ test("server: endpoints, validation, host guard, CSRF-style header on refresh", 
   const srv = createServer();
   await new Promise<void>((r) => srv.listen(0, "127.0.0.1", r));
   const port = (srv.address() as AddressInfo).port;
-  const app = createApp(db, { FRED_API_KEY: "k" }, port, fakeDeps);
+  const app = createApp(db, { FRED_API_KEY: "k" }, port, fakeDeps, async () => []);
   srv.on("request", app.handler);
   const base = `http://127.0.0.1:${port}`;
   try {

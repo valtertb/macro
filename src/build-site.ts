@@ -15,6 +15,7 @@ import { fetchText } from "./http.ts";
 import { loadCot } from "./cot.ts";
 import type { CotFetcher, CotResult } from "./cot.ts";
 import { ingestAll } from "./ingest.ts";
+import { bratislavaDate, sessionBias } from "./session.ts";
 import type { IngestDeps } from "./ingest.ts";
 import { loadData } from "./refresh.ts";
 import { computeBias, prepare } from "./scoring/engine.ts";
@@ -92,6 +93,7 @@ export async function buildSite(opts: {
   });
 
   const generatedAt = now.toISOString();
+  const session = sessionBias(assets, cot.markets, upcomingCalendar(db, bratislavaDate(now), 1), now);
   const data = join(opts.outDir, "data");
   mkdirSync(data, { recursive: true });
   mkdirSync(dirname(opts.historyPath), { recursive: true });
@@ -102,6 +104,7 @@ export async function buildSite(opts: {
     generatedAt, version: MODEL_VERSION, lastRefreshAt: generatedAt,
     fredConfigured: !!opts.env.FRED_API_KEY?.trim(),
     dataMode: "daily-and-monthly-public-data (nie real-time)",
+    session,
     assets,
   });
   for (const s of SYMBOLS) {

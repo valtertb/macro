@@ -10,6 +10,7 @@ import { freshnessOf, ageDays } from "./scoring/signals.ts";
 import { computeBias, prepare } from "./scoring/engine.ts";
 import { explain } from "./scoring/explain.ts";
 import { loadCot } from "./cot.ts";
+import { bratislavaDate, sessionBias } from "./session.ts";
 import type { CotFetcher, CotResult } from "./cot.ts";
 import type { IngestDeps } from "./ingest.ts";
 import { loadData, refreshAll } from "./refresh.ts";
@@ -87,11 +88,13 @@ export function createApp(db: Db, env: Record<string, string | undefined>, port:
         return send(res, 200, readFileSync(join(ROOT, "public", "index.html"), "utf8"), "text/html; charset=utf-8");
       }
       if (req.method === "GET" && path === "/api/bias/current") {
+        const assets = liveBias(db, now);
         return send(res, 200, {
           generatedAt: now.toISOString(), version: MODEL_VERSION,
           lastRefreshAt: getMeta(db, "last_refresh_at"), fredConfigured: !!env.FRED_API_KEY?.trim(),
           dataMode: "daily-and-monthly-public-data (nie real-time)",
-          assets: liveBias(db, now),
+          session: sessionBias(assets, (await getCot()).markets, upcomingCalendar(db, bratislavaDate(now), 1), now),
+          assets,
         });
       }
       const h = path.match(/^\/api\/bias\/([^/]+)\/history$/);
