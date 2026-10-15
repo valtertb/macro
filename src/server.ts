@@ -4,7 +4,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { INDICATORS, MODEL, MODEL_VERSION, SYMBOLS, SYMBOL_NAMES } from "./config.ts";
-import { getMeta, history, lastSnapshot, openDb, upcomingCalendar } from "./db.ts";
+import { getMeta, history, lastObsProvider, lastSnapshot, openDb, upcomingCalendar } from "./db.ts";
 import type { Db } from "./db.ts";
 import { freshnessOf, ageDays } from "./scoring/signals.ts";
 import { computeBias, prepare } from "./scoring/engine.ts";
@@ -43,7 +43,7 @@ export function indicatorStatus(db: Db, now: Date) {
     const fr = last ? freshnessOf(def.code, last.date, now) : 0;
     return {
       code: def.code, name: def.name, provider: def.provider, frequency: def.frequency, unit: def.unit, scoring: def.scoring, restricted: !!def.restricted,
-      ref: getMeta(db, `ref:${def.code}`) ?? def.ref, note: def.note ?? null,
+      ref: getMeta(db, `ref:${def.code}`) ?? def.ref, note: def.note ?? null, lastSource: lastObsProvider(db, def.code),
       lastDate: last?.date ?? null, lastValue: last?.value ?? null, ageDays: last ? ageDays(last.date, now) : null,
       state: !last ? "missing" : fr >= 1 ? "ok" : fr > 0 ? "stale" : "expired",
       lastAttemptAt: st?.last_attempt_at ?? null, lastSuccessAt: st?.last_success_at ?? null, lastError: st?.last_error ?? null,

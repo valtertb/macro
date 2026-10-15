@@ -135,6 +135,22 @@ export function upsertObservations(db: Db, code: string, provider: string, obs: 
   return { inserted, revised };
 }
 
+/** Adds observations only for dates not yet stored (used for supplements; never overwrites the main provider). */
+export function insertMissingObservations(db: Db, code: string, provider: string, obs: Obs[], retrievedAt: string): number {
+  const ins = db.prepare("INSERT OR IGNORE INTO observations (indicator, obs_date, value, provider, retrieved_at) VALUES (?, ?, ?, ?, ?)");
+  let added = 0;
+  tx(db, () => {
+    for (const o of obs) added += Number(ins.run(code, o.date, o.value, provider, retrievedAt).changes);
+  });
+  return added;
+}
+
+/** Provider that supplied the latest observation of an indicator. */
+export function lastObsProvider(db: Db, code: string): string | null {
+  const r = db.prepare("SELECT provider FROM observations WHERE indicator = ? ORDER BY obs_date DESC LIMIT 1").get(code) as { provider: string } | undefined;
+  return r?.provider ?? null;
+}
+
 export function getSeries(db: Db, code: string): Obs[] {
   return (db.prepare("SELECT obs_date AS date, value FROM observations WHERE indicator = ? ORDER BY obs_date ASC").all(code) as unknown as Obs[]);
 }

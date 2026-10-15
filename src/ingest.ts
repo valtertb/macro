@@ -1,9 +1,11 @@
 import { INDICATORS, STATIC_CALENDAR, WATCHED_RELEASES } from "./config.ts";
 import type { IndicatorDef } from "./config.ts";
-import { getMeta, lastObsDate, logEvent, setMeta, replaceCalendar, setIndicatorStatus, setProviderStatus, upsertObservations } from "./db.ts";
+import { getMeta, insertMissingObservations, lastObsDate, logEvent, setMeta, replaceCalendar, setIndicatorStatus, setProviderStatus, upsertObservations } from "./db.ts";
 import type { Db } from "./db.ts";
 import { redact } from "./http.ts";
 import { fetchEcbSeries } from "./providers/ecb.ts";
+import { fetchTreasuryMonth, parseTreasuryXml, recentMonths } from "./providers/treasury.ts";
+import type { TreasuryFeed } from "./providers/treasury.ts";
 import { fetchFredReleaseDates, fetchFredSeries } from "./providers/fred.ts";
 import type { ReleaseDate } from "./providers/fred.ts";
 import type { Obs } from "./types.ts";
@@ -12,6 +14,7 @@ export interface IngestDeps {
   fetchFred?: (id: string, key: string, start: string) => Promise<Obs[]>;
   fetchEcb?: (def: IndicatorDef, start: string) => Promise<Obs[]>;
   fetchReleases?: (key: string, from: string, to: string) => Promise<ReleaseDate[]>;
+  fetchTreasury?: (feed: TreasuryFeed, yyyymm: string) => Promise<string>;
 }
 
 export interface IngestReport {
@@ -93,10 +96,38 @@ export async function ingestAll(db: Db, env: Record<string, string | undefined>,
     }
   }
 
-  for (const p of ["FRED", "ECB"] as const) {
+  // Supplements: the same series from its original publisher, which posts the latest day earlier than FRED.
+  // Only dates the main provider does not have are added. Requires main-provider history to exist.
+  counts.TREASURY = { ok: 0, fail: 0 };
+  const treasury = deps.fetchTreasury ?? ((feed, ym) => fetchTreasuryMonth(feed, ym));
+  const xmlCache = new Map<string, Promise<string>>();
+  for (const def of INDICATORS.filter((i) => i.supplement)) {
+    const sup = def.supplement!;
+    const c = counts[sup.provider];
+    if (!lastObsDate(db, def.code)) continue; // no history to extend -> nothing to supplement
+    try {
+      let obs: Obs[] = [];
+      for (const ym of recentMonths(now)) {
+        const k = `${sup.feed}|${ym}`;
+        if (!xmlCache.has(k)) xmlCache.set(k, treasury(sup.feed, ym));
+        obs = obs.concat(parseTreasuryXml(await xmlCache.get(k)!, sup.field));
+      }
+      const added = insertMissingObservations(db, def.code, sup.provider, obs, at);
+      if (added) logEvent(db, "info", "ingest", `${def.code}: +${added} novších dní z US Treasury`, at);
+      c.ok++;
+    } catch (e) {
+      const msg = redact(e instanceof Error ? e.message : String(e));
+      logEvent(db, "warn", "ingest", `${def.code} (US Treasury): ${msg}`, at);
+      c.fail++;
+      c.err = msg;
+    }
+  }
+
+  for (const p of ["FRED", "ECB", "TREASURY"] as const) {
     const c = counts[p];
     let health: string;
     let detail: string | null = null;
+    if (p === "TREASURY" && c.ok + c.fail === 0) continue;
     if (p === "FRED" && !key) { health = "unconfigured"; detail = "Chýba FRED_API_KEY"; }
     else if (c.fail === 0) health = "ok";
     else if (c.ok === 0) { health = "down"; detail = c.err ?? null; }

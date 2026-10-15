@@ -91,3 +91,12 @@ export function age(data: Data, code: string, days: number): Data {
   const s = data[code].map((o) => ({ ...o, date: new Date(Date.parse(o.date + "T00:00:00Z") - days * 86400000).toISOString().slice(0, 10) }));
   return { ...data, [code]: s };
 }
+
+/** Builds a Treasury-style Atom XML document (hand-written in the feed's documented shape; SYNTHETIC values). */
+export function treasuryXml(rows: { date: string; fields: Record<string, number | null> }[]): string {
+  const entries = rows.map((r, i) => `<entry><id>x(${i})</id><content type="application/xml"><m:properties>` +
+    `<d:Id m:type="Edm.Int32">${i}</d:Id><d:NEW_DATE m:type="Edm.DateTime">${r.date}T00:00:00</d:NEW_DATE>` +
+    Object.entries(r.fields).map(([k, v]) => v === null ? `<d:${k} m:type="Edm.Double" m:null="true" />` : `<d:${k} m:type="Edm.Double">${v}</d:${k}>`).join("") +
+    `</m:properties></content></entry>`).join("");
+  return `<?xml version="1.0" encoding="utf-8"?><feed xml:base="https://home.treasury.gov/" xmlns="http://www.w3.org/2005/Atom" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata"><title type="text">DailyTreasuryYieldCurveRateData</title>${entries}</feed>`;
+}

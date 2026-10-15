@@ -61,7 +61,7 @@
   <h2>Zdroje dát a ich stav</h2>
   <div class="panel scroll" id="sources"></div>
   <p class="small">Skóre je makroekonomické hodnotenie z verejných denných/mesačných dát, nie obchodný signál a nie real-time. Váhy modelu sú hypotézy, ešte neoverené históriou.</p>
-  <p class="small">Zdroje: FRED® (Federal Reserve Bank of St. Louis) a ECB Data Portal (© European Central Bank). This product uses the FRED® API but is not endorsed or certified by the Federal Reserve Bank of St. Louis. Hodnoty sérií © CBOE a © ICE BofA sa nezverejňujú.</p>
+  <p class="small">Zdroje: US Department of the Treasury (denné výnosy), FRED® (Federal Reserve Bank of St. Louis) a ECB Data Portal (© European Central Bank). This product uses the FRED® API but is not endorsed or certified by the Federal Reserve Bank of St. Louis. Hodnoty sérií © CBOE a © ICE BofA sa nezverejňujú.</p>
 </div>
 <!--STATIC-CONFIG-->
 <script>
@@ -196,7 +196,7 @@ async function renderSides() {
   const ph = src.providers.map(p => h("span", { class: "chip " + (p.health === "ok" ? "" : p.health === "degraded" ? "warn" : "bad") }, p.provider + ": " + (HEALTH[p.health] || p.health)));
   s.append(h("div", { style: "margin-bottom:8px" }, ph.length ? ph : h("span", { class: "small" }, "Zatiaľ nebol žiadny pokus o načítanie. Stlač „Obnoviť dáta“.")),
     h("table", {}, h("thead", {}, h("tr", {}, ["Ukazovateľ", "Zdroj", "Frekvencia", "Posledný údaj", "Vek", "Stav", "Poznámka / chyba"].map(t => h("th", {}, t)))),
-      h("tbody", {}, src.indicators.map(i => h("tr", {}, h("td", {}, i.name + (i.scoring ? "" : " (kontext)")), h("td", {}, i.provider + " " + i.ref), h("td", {}, i.frequency),
+      h("tbody", {}, src.indicators.map(i => h("tr", {}, h("td", {}, i.name + (i.scoring ? "" : " (kontext)")), h("td", {}, i.provider + " " + i.ref + (i.lastSource && i.lastSource !== i.provider ? " · posledný deň z US Treasury" : "")), h("td", {}, i.frequency),
         h("td", {}, i.lastDate ? i.lastDate + (i.lastValue == null ? " (hodnota nezverejnená)" : " (" + (+i.lastValue.toFixed(3)) + " " + i.unit + ")") : "—"), h("td", {}, i.ageDays == null ? "—" : i.ageDays + " d"),
         h("td", { class: i.state === "ok" ? "" : i.state === "stale" ? "bear" : "bear" }, STATE[i.state]), h("td", { class: "small" }, i.lastError || i.note || ""))))));
   if (src.events.length) s.append(h("div", { class: "small", style: "margin-top:8px" }, "Posledná udalosť systému: " + fmtLocal(src.events[0].occurred_at) + " — " + src.events[0].message));

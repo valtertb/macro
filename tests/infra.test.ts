@@ -12,12 +12,13 @@ import { parseEcbCsv } from "../src/providers/ecb.ts";
 import { parseFredObservations, parseFredReleaseDates } from "../src/providers/fred.ts";
 import { refreshAll, scoreAll } from "../src/refresh.ts";
 import { createApp, parseSymbol } from "../src/server.ts";
-import { NOW, makeData } from "./fixtures.ts";
+import { NOW, makeData, treasuryXml } from "./fixtures.ts";
 
 const synthetic = makeData();
 const fakeDeps: IngestDeps = {
   fetchFred: async (id) => { if (!synthetic[id]) throw new Error("no synthetic series " + id); return synthetic[id]; },
   fetchEcb: async (def) => { if (!synthetic[def.code]) throw new Error("synthetic: " + def.code + " not available"); return synthetic[def.code]; },
+  fetchTreasury: async () => treasuryXml([]),
   fetchReleases: async () => [
     { date: "2026-10-22", name: "Consumer Price Index" },
     { date: "2026-10-23", name: "Some Random Release" },

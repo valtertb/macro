@@ -1,5 +1,6 @@
 import { INDICATORS_BY_CODE, MODEL } from "../config.ts";
 import {
+  asOfJoin,
   changes,
   deviationFromTrailingMean,
   diffSeries,
@@ -28,7 +29,9 @@ export function freshnessOf(code: string, date: string, now: Date): number {
 /** Adds derived indicators. A derived series exists only if all its sources exist. */
 export function buildDerived(raw: Data): Data {
   const out: Data = { ...raw };
-  if (raw.DGS2?.length && raw.DFF?.length) out.US_2Y_FF = joinSeries(raw.DGS2, raw.DFF, (a, b) => a - b);
+  // Fed funds is a policy rate that changes only at FOMC decisions and FRED posts it a day later than Treasury yields,
+  // so the last known level (max 5 days old) is used for the newest yield date.
+  if (raw.DGS2?.length && raw.DFF?.length) out.US_2Y_FF = asOfJoin(raw.DGS2, raw.DFF, (a, b) => a - b, 5);
   if (raw.DGS10?.length && raw.EA10Y?.length) out.US10_EA10 = joinSeries(raw.DGS10, raw.EA10Y, (a, b) => a - b);
   if (raw.CPILFESL?.length) out.CORE_CPI_MOM = pctChange(raw.CPILFESL);
   if (raw.PAYEMS?.length) out.NFP_CHG = diffSeries(raw.PAYEMS);

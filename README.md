@@ -53,6 +53,7 @@ Server počúva len na `127.0.0.1`, kontroluje hlavičku Host a obnovenie cez PO
 |---|---|---|---|
 | Fed Funds, US 2Y/10Y, 10Y reálny výnos, široký USD index, VIX, HY OAS, Core CPI, NFP, nezamestnanosť | FRED API | zadarmo, povinný (120 volaní/min) | denné / mesačné, **nie real-time**; USD index má oneskorenie |
 | Eurozóna 2Y/10Y výnos (AAA krivka), core HICP, depozitná sadzba, EUR/USD ref. kurz | ECB Data Portal (SDMX) | netreba | denné / mesačné |
+| US 2Y, 10Y a 10Y reálny výnos (najnovší deň) | US Treasury, denný XML feed | netreba | uzávierka dňa, zverejnená večer v ten istý deň. Dopĺňa iba dni, ktoré FRED ešte nemá (FRED je o ~1 deň pozadu). |
 | Kalendár vydaní USA | FRED `releases/dates` | rovnaký kľúč | dátumy bez presného času |
 | FOMC a ECB rozhodnutia | manuálny zoznam v `src/config.ts` | – | **overené 15. 10. 2026** na federalreserve.gov a ecb.europa.eu, raz ročne treba skontrolovať |
 

@@ -56,6 +56,22 @@ export function joinSeries(a: Obs[], b: Obs[], op: (x: number, y: number) => num
   return out;
 }
 
+/**
+ * As-of join: for each date in `a`, use the latest `b` observation on or before that date, but only if it is at most
+ * `maxGapDays` old. Meant for step-like series such as a policy rate (carrying the last known level, never interpolating).
+ */
+export function asOfJoin(a: Obs[], b: Obs[], op: (x: number, y: number) => number, maxGapDays: number): Obs[] {
+  const out: Obs[] = [];
+  let j = -1;
+  for (const o of a) {
+    while (j + 1 < b.length && b[j + 1].date <= o.date) j++;
+    if (j < 0) continue;
+    const gap = (Date.parse(o.date) - Date.parse(b[j].date)) / 86_400_000;
+    if (gap <= maxGapDays) out.push({ date: o.date, value: op(o.value, b[j].value) });
+  }
+  return out;
+}
+
 /** Percent change vs previous observation, in percent. */
 export function pctChange(s: Obs[]): Obs[] {
   const out: Obs[] = [];

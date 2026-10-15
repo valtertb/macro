@@ -6,12 +6,13 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { buildSite } from "../src/build-site.ts";
 import type { IngestDeps } from "../src/ingest.ts";
-import { NOW, makeData } from "./fixtures.ts";
+import { NOW, makeData, treasuryXml } from "./fixtures.ts";
 
 const synthetic = makeData();
 const deps: IngestDeps = {
   fetchFred: async (id) => { if (!synthetic[id]) throw new Error("no synthetic " + id); return synthetic[id]; },
   fetchEcb: async (def) => { if (!synthetic[def.code]) throw new Error("synthetic: " + def.code + " not available"); return synthetic[def.code]; },
+  fetchTreasury: async () => treasuryXml([]),
   fetchReleases: async () => [{ date: "2026-10-22", name: "Consumer Price Index" }],
 };
 

@@ -34,6 +34,11 @@ export interface IndicatorDef {
   restricted?: boolean;
   /** Alternative refs for the SAME concept (e.g. after a provider renamed a dataset). The ref with the most recent data wins; series are never spliced. */
   altRefs?: string[];
+  /**
+   * Same series published earlier by its original source. Recent observations from it fill dates the main provider
+   * does not have yet (definition and units are identical; values are never blended or interpolated).
+   */
+  supplement?: { provider: "TREASURY"; feed: "daily_treasury_yield_curve" | "daily_treasury_real_yield_curve"; field: string };
 }
 
 const D = { staleDays: 5, expireDays: 14 };
@@ -42,9 +47,9 @@ const M = { staleDays: 50, expireDays: 90 };
 export const INDICATORS: IndicatorDef[] = [
   // ---- FRED (US) ----
   { code: "DFF", name: "Fed Funds Rate (efektívna)", unit: "%", frequency: "daily", provider: "FRED", ref: "DFF", ...D, quality: 1, historyStart: "2016-01-01", scoring: true },
-  { code: "DGS2", name: "US 2Y výnos (CMT)", unit: "%", frequency: "daily", provider: "FRED", ref: "DGS2", ...D, quality: 1, historyStart: "2016-01-01", scoring: true, note: "Denný záznam US Treasury cez FRED, nie real-time." },
-  { code: "DGS10", name: "US 10Y výnos (CMT)", unit: "%", frequency: "daily", provider: "FRED", ref: "DGS10", ...D, quality: 1, historyStart: "2016-01-01", scoring: true },
-  { code: "DFII10", name: "US 10Y reálny výnos (TIPS)", unit: "%", frequency: "daily", provider: "FRED", ref: "DFII10", ...D, quality: 1, historyStart: "2016-01-01", scoring: true },
+  { code: "DGS2", name: "US 2Y výnos (CMT)", unit: "%", frequency: "daily", provider: "FRED", ref: "DGS2", ...D, quality: 1, historyStart: "2016-01-01", scoring: true, supplement: { provider: "TREASURY", feed: "daily_treasury_yield_curve", field: "BC_2YEAR" }, note: "Uzávierka dňa. Najnovší deň priamo z US Treasury (večer v deň obchodovania), história z FRED. Nie real-time." },
+  { code: "DGS10", name: "US 10Y výnos (CMT)", unit: "%", frequency: "daily", provider: "FRED", ref: "DGS10", ...D, quality: 1, historyStart: "2016-01-01", scoring: true, supplement: { provider: "TREASURY", feed: "daily_treasury_yield_curve", field: "BC_10YEAR" }, note: "Uzávierka dňa. Najnovší deň priamo z US Treasury, história z FRED." },
+  { code: "DFII10", name: "US 10Y reálny výnos (TIPS)", unit: "%", frequency: "daily", provider: "FRED", ref: "DFII10", ...D, quality: 1, historyStart: "2016-01-01", scoring: true, supplement: { provider: "TREASURY", feed: "daily_treasury_real_yield_curve", field: "TC_10YEAR" }, note: "Uzávierka dňa. Najnovší deň priamo z US Treasury, história z FRED." },
   { code: "DTWEXBGS", name: "Široký index USD (Fed, nominálny)", unit: "index", frequency: "daily", provider: "FRED", ref: "DTWEXBGS", staleDays: 10, expireDays: 30, quality: 0.7, historyStart: "2016-01-01", scoring: true, note: "Nie je to DXY. Fed H.10 index s oneskorením; obsahuje aj EUR (čiastočná cirkularita pre EUR/USD)." },
   { code: "VIXCLS", name: "VIX (uzávierka)", unit: "index", frequency: "daily", provider: "FRED", ref: "VIXCLS", ...D, quality: 0.9, historyStart: "2016-01-01", scoring: true, restricted: true, note: "Dáta © CBOE cez FRED. Hodnoty sa na webe nezverejňujú, iba vstupujú do skóre." },
   { code: "BAMLH0A0HYM2", name: "US High Yield OAS", unit: "%", frequency: "daily", provider: "FRED", ref: "BAMLH0A0HYM2", ...D, quality: 0.9, historyStart: "2016-01-01", scoring: true, restricted: true, note: "Dáta © ICE BofA cez FRED (história obmedzená licenciou). Hodnoty sa na webe nezverejňujú, iba vstupujú do skóre." },
