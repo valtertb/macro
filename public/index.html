@@ -26,7 +26,7 @@
   .bull { color:var(--bull); } .bear { color:var(--bear); } .neu { color:var(--neu); }
   .badge { display:inline-block; padding:2px 8px; border-radius:999px; border:1px solid currentColor; font-size:12px; }
   .chip { display:inline-block; padding:1px 7px; border-radius:4px; background:#21262d; color:var(--mute); font-size:11px; margin-left:6px; }
-  .chip.warn { color:var(--warn); } .chip.bad { color:var(--bear); }
+  .chip.warn { color:var(--warn); } td.warn { color:var(--warn); } .chip.bad { color:var(--bear); }
   .drivers { margin:8px 0 0; padding:0; list-style:none; font-size:12.5px; }
   .drivers li { display:flex; justify-content:space-between; gap:8px; padding:2px 0; border-top:1px solid var(--line); }
   .small { color:var(--mute); font-size:12px; }
@@ -43,6 +43,12 @@
   ul.plain { margin:4px 0 0; padding-left:18px; } ul.plain li { margin:3px 0; }
   .cols { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px; }
   svg { max-width:100%; }
+  .meter { position:relative; height:10px; min-width:110px; background:#0f141a; border-radius:3px; }
+  .meter .zone { position:absolute; top:0; bottom:0; background:#2a2110; }
+  .meter .dot { position:absolute; top:-2px; width:4px; height:14px; border-radius:2px; background:var(--text); transform:translateX(-2px); }
+  .cotnote { margin-top:8px; }
+  #cot th, #cot td:not(:last-child) { white-space:nowrap; }
+  #cot td:last-child { min-width:260px; }
   @media (max-width:600px) { .score { font-size:38px; } .wrap { padding:10px; } }
 </style>
 </head>
@@ -55,6 +61,8 @@
   <div class="meta" id="meta"></div>
   <div id="banners"></div>
   <div class="cards" id="cards"></div>
+  <h2>COT: pozície veľkých hráčov (CFTC, týždenne)</h2>
+  <div class="panel scroll" id="cot"></div>
   <div id="detail"></div>
   <h2>Kalendár katalyzátorov (30 dní)</h2>
   <div class="panel scroll" id="calendar"></div>
@@ -70,7 +78,7 @@ const CLS = { strong_bearish:["Silno medvedí","bear"], bearish:["Medvedí","bea
 const STATUS = { normal:["Normálne",""], provisional:["Provizórne","warn"], insufficient:["Nedostatok dát","bad"] };
 const HEALTH = { ok:"OK", degraded:"Čiastočne", down:"Nedostupný", unconfigured:"Nenastavený" };
 const STATE = { ok:"aktuálne", stale:"zastarané", expired:"vypršané", missing:"chýba" };
-let selected = "GC", cache = null;
+let selected = "GC", cache = null, cotData = null;
 
 function h(tag, attrs, ...kids) {
   const e = document.createElement(tag);
@@ -95,6 +103,7 @@ function staticPath(path) {
   const m = path.match(/^\/api\/bias\/([^/]+)\/history/); if (m) return "data/history-" + m[1] + ".json";
   if (path.startsWith("/api/providers/status")) return "data/status.json";
   if (path.startsWith("/api/calendar/upcoming")) return "data/calendar.json";
+  if (path.startsWith("/api/cot")) return "data/cot.json";
   throw new Error("V statickom režime nedostupné: " + path);
 }
 async function api(path, opts) {
@@ -129,7 +138,7 @@ function renderCards() {
     box.append(h("div", { class: "card" + (a.symbol === selected ? " sel" : ""), onclick: () => { selected = a.symbol; renderCards(); renderDetail(); } },
       h("div", { class: "top" }, h("span", { class: "sym" }, a.name), h("span", { class: "chip " + stc }, st)),
       h("div", { class: "score " + cc }, ok ? sg(b.displayedScore) : "—"),
-      h("div", {}, h("span", { class: "badge " + cc }, cl), h("span", { class: "chip" }, "Istota " + (b.confidence ?? "—") + (b.confidence != null ? "/100" : ""))),
+      h("div", {}, h("span", { class: "badge " + cc }, cl), h("span", { class: "chip" }, "Istota " + (b.confidence ?? "—") + (b.confidence != null ? "/100" : "")), cotChip(a.symbol)),
       h("ul", { class: "drivers" }, top.length ? top.map(f => h("li", {}, h("span", {}, f.label), h("span", { class: clsOf(f.contribution) }, sg(f.contribution, 2)))) : h("li", {}, "Žiadne dostupné faktory")),
       h("div", { class: "small", style: "margin-top:8px" }, "Posledné dáta: " + (latestInputDate(b) ?? "—") + " · Prepočítané: " + fmtLocal(b.calculatedAt))));
   }
@@ -187,6 +196,43 @@ async function renderDetail() {
     h("h2", {}, "História skóre (uložené snapshoty)"), h("div", { class: "panel" }, spark(hist.points)));
 }
 
+
+const nf = (x) => (x > 0 ? "+" : "") + Math.round(x).toLocaleString("sk-SK");
+function cotOf(sym) { return cotData && cotData.markets ? cotData.markets.find(m => m.symbol === sym) : null; }
+function cotChip(sym) {
+  const m = cotOf(sym); if (!m || m.signal === "none" || m.signal === "insufficient") return null;
+  return h("span", { class: "chip warn", title: m.signalText }, m.signal === "crowded_long" ? "COT: preplnený long" : "COT: preplnený short");
+}
+function meter(idx) {
+  if (idx == null) return h("span", { class: "small" }, "n/a");
+  return h("div", { style: "display:flex;gap:8px;align-items:center" },
+    h("div", { class: "meter", title: "COT index za 3 roky; zvýraznené pásma = extrém (≤10, ≥90)" },
+      h("div", { class: "zone", style: "left:0;width:10%" }), h("div", { class: "zone", style: "left:90%;width:10%" }),
+      h("div", { class: "dot", style: "left:" + Math.max(0, Math.min(100, idx)) + "%" })),
+    h("span", { class: "num" }, Math.round(idx)));
+}
+function renderCot() {
+  const box = document.getElementById("cot"); box.replaceChildren();
+  if (!cotData || !cotData.markets || !cotData.markets.length) {
+    box.append(h("div", { class: "small" }, "COT dáta nie sú dostupné." + (cotData && cotData.errors && cotData.errors.length ? " Chyba: " + cotData.errors.map(e => e.symbol + " – " + e.error).join("; ") : "")));
+    return;
+  }
+  const head = ["Trh", "Pozície k", "Špekulanti net", "Zmena t/t", "% OI", "COT index špek.", "Komerční net", "COT index kom.", "Signál"];
+  box.append(h("table", {},
+    h("thead", {}, h("tr", {}, head.map((t, i) => h("th", { class: [2, 3, 4, 6].includes(i) ? "num" : "" }, t)))),
+    h("tbody", {}, cotData.markets.map(m => h("tr", {},
+      h("td", {}, m.label),
+      h("td", { class: m.stale ? "bear" : "" }, m.date + (m.stale ? " (staré)" : "")),
+      h("td", { class: "num " + clsOf(m.spec.net) }, nf(m.spec.net)),
+      h("td", { class: "num " + clsOf(m.spec.change ?? 0) }, m.spec.change == null ? "—" : nf(m.spec.change)),
+      h("td", { class: "num" }, m.spec.pctOi.toFixed(1) + " %"),
+      h("td", {}, meter(m.spec.index)),
+      h("td", { class: "num " + clsOf(m.comm.net) }, nf(m.comm.net)),
+      h("td", {}, meter(m.comm.index)),
+      h("td", { class: "small" + (m.signal === "crowded_long" || m.signal === "crowded_short" ? " warn" : "") }, m.signalText))))),
+    h("p", { class: "small cotnote" }, "Špekulanti = non-commercial (fondy, CTA), komerční = hedgeri. COT index ukazuje, kde je dnešná čistá pozícia medzi minimom (0) a maximom (100) za posledné 3 roky. Pozície sú k utorku, CFTC ich zverejňuje v piatok o 21:30 nášho času. Iba kontext, do makro skóre nevstupuje. Zdroj: " + cotData.source + "."));
+}
+
 async function renderSides() {
   const [cal, src] = await Promise.all([api("/api/calendar/upcoming"), api("/api/providers/status")]);
   const c = document.getElementById("calendar"); c.replaceChildren();
@@ -219,7 +265,8 @@ async function load() {
     const hrs = (Date.now() - Date.parse(cache.lastRefreshAt)) / 3600000;
     if (hrs > 30) bn.append(h("div", { class: "banner" }, "Stránka nebola aktualizovaná " + Math.floor(hrs) + " hodín. Automatická aktualizácia mohla zlyhať — skontroluj GitHub Actions."));
   }
-  renderCards(); await renderDetail(); await renderSides();
+  try { cotData = await api("/api/cot"); } catch (e) { cotData = { markets: [], errors: [{ symbol: "COT", error: e.message }] }; }
+  renderCards(); renderCot(); await renderDetail(); await renderSides();
 }
 
 if (STATIC) {

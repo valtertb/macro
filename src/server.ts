@@ -9,6 +9,8 @@ import type { Db } from "./db.ts";
 import { freshnessOf, ageDays } from "./scoring/signals.ts";
 import { computeBias, prepare } from "./scoring/engine.ts";
 import { explain } from "./scoring/explain.ts";
+import { loadCot } from "./cot.ts";
+import type { CotFetcher, CotResult } from "./cot.ts";
 import type { IngestDeps } from "./ingest.ts";
 import { loadData, refreshAll } from "./refresh.ts";
 import type { Symbol } from "./types.ts";
@@ -56,12 +58,19 @@ function send(res: ServerResponse, status: number, body: unknown, type = "applic
   res.end(typeof body === "string" ? body : JSON.stringify(body));
 }
 
-export function createApp(db: Db, env: Record<string, string | undefined>, port: number, deps?: IngestDeps) {
+export function createApp(db: Db, env: Record<string, string | undefined>, port: number, deps?: IngestDeps, cotFetcher?: CotFetcher) {
   let refreshing: Promise<unknown> | null = null;
+  // COT is weekly: cache it for 1 hour (and reload on manual refresh).
+  let cot: { at: number; data: Promise<CotResult> } | null = null;
+  const getCot = (fresh = false) => {
+    if (fresh || !cot || Date.now() - cot.at > 3_600_000) cot = { at: Date.now(), data: loadCot(new Date(), cotFetcher) };
+    return cot.data;
+  };
   const allowedHosts = new Set([`localhost:${port}`, `127.0.0.1:${port}`]);
 
   async function runRefresh(force: boolean) {
     if (refreshing) return refreshing; // one refresh at a time
+    if (force) void getCot(true);
     refreshing = refreshAll(db, env, { force, deps }).finally(() => { refreshing = null; });
     return refreshing;
   }
@@ -102,6 +111,9 @@ export function createApp(db: Db, env: Record<string, string | undefined>, port:
       }
       if (req.method === "GET" && path === "/api/calendar/upcoming") {
         return send(res, 200, { generatedAt: now.toISOString(), events: upcomingCalendar(db, now.toISOString().slice(0, 10), 30) });
+      }
+      if (req.method === "GET" && path === "/api/cot") {
+        return send(res, 200, await getCot());
       }
       if (req.method === "GET" && path === "/api/model") {
         return send(res, 200, { version: MODEL_VERSION, params: MODEL });

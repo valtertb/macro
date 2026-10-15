@@ -12,6 +12,8 @@ import { fileURLToPath } from "node:url";
 import { INDICATORS_BY_CODE, MODEL_VERSION, SYMBOLS, SYMBOL_NAMES } from "./config.ts";
 import { openDb, upcomingCalendar } from "./db.ts";
 import { fetchText } from "./http.ts";
+import { loadCot } from "./cot.ts";
+import type { CotFetcher, CotResult } from "./cot.ts";
 import { ingestAll } from "./ingest.ts";
 import type { IngestDeps } from "./ingest.ts";
 import { loadData } from "./refresh.ts";
@@ -53,10 +55,16 @@ export async function buildSite(opts: {
   historyPath: string;
   now?: Date;
   deps?: IngestDeps;
+  /** COT data source; defaults to CFTC. Tests that inject `deps` must inject this too, otherwise COT is skipped. */
+  cotFetcher?: CotFetcher;
 }) {
   const now = opts.now ?? new Date();
   const db = openDb(":memory:");
   const ingest = await ingestAll(db, opts.env, now, opts.deps);
+  const cot: CotResult = opts.cotFetcher || !opts.deps
+    ? await loadCot(now, opts.cotFetcher)
+    : { generatedAt: now.toISOString(), source: "skipped", markets: [], errors: [] };
+  const cotHealth = cot.source === "skipped" ? null : cot.errors.length === 0 ? "ok" : cot.markets.length ? "degraded" : "down";
 
   const history: History = existsSync(opts.historyPath) ? JSON.parse(readFileSync(opts.historyPath, "utf8")) : {};
   const prep = prepare(loadData(db), now);
@@ -101,10 +109,14 @@ export async function buildSite(opts: {
   }
   write("status.json", {
     generatedAt,
-    providers: Object.entries(ingest.providers).map(([provider, health]) => ({ provider, health, last_attempt_at: generatedAt })),
+    providers: [
+      ...Object.entries(ingest.providers).map(([provider, health]) => ({ provider, health, last_attempt_at: generatedAt })),
+      ...(cotHealth ? [{ provider: "CFTC", health: cotHealth, detail: cot.errors.map((e) => `${e.symbol}: ${e.error}`).join("; ") || null, last_attempt_at: generatedAt }] : []),
+    ],
     indicators: indicatorStatus(db, now).map((i) => (i.restricted ? { ...i, lastValue: null } : i)),
     events: db.prepare("SELECT severity, component, message, occurred_at FROM system_events ORDER BY id DESC LIMIT 20").all(),
   });
+  write("cot.json", cot);
   write("calendar.json", { generatedAt, events: upcomingCalendar(db, generatedAt.slice(0, 10), 30) });
 
   // Diagnostics: if euro-area core inflation is not current, publish the list of available HICP annual-rate codes
