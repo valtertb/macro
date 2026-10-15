@@ -57,6 +57,15 @@
    "status": "provisional",
    "input_hash": "434da27fa63c1c8e85ffe7de8b5e02e57e0ff8e9",
    "version": "mvp-0.1.0"
+  },
+  {
+   "calculated_at": "2026-10-15T10:16:47.341Z",
+   "displayed_score": 0.2,
+   "classification": "neutral",
+   "confidence": 77,
+   "status": "normal",
+   "input_hash": "d5b973017559110b6bb59a044cec6a94ee9f0aee",
+   "version": "mvp-0.1.0"
   }
  ]
 }
