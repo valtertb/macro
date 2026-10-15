@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Macro Daily Bias Terminal</title>
+<style>
+  :root { color-scheme:dark; --bg:#0d1117; --panel:#161b22; --line:#262d37; --text:#e6edf3; --mute:#8b949e; --bull:#3fb950; --bear:#f85149; --neu:#8b949e; --warn:#d29922; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  .wrap { max-width:1180px; margin:0 auto; padding:16px; }
+  header { display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  h1 { font-size:18px; letter-spacing:.08em; margin:0; }
+  h2 { font-size:13px; letter-spacing:.06em; text-transform:uppercase; color:var(--mute); margin:20px 0 8px; }
+  .meta { display:flex; flex-wrap:wrap; gap:14px; color:var(--mute); font-size:12px; }
+  .meta b { color:var(--text); font-weight:600; }
+  button { background:#21262d; color:var(--text); border:1px solid var(--line); border-radius:6px; padding:7px 12px; cursor:pointer; font:inherit; }
+  button:hover { background:#2b323b; } button:disabled { opacity:.5; cursor:wait; }
+  .banner { border:1px solid var(--warn); background:#2a2110; color:#e3b341; padding:10px 12px; border-radius:8px; margin:8px 0; font-size:13px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px; cursor:pointer; }
+  .card.sel { border-color:#58a6ff; }
+  .card .top { display:flex; justify-content:space-between; align-items:baseline; }
+  .sym { font-weight:700; letter-spacing:.05em; }
+  .score { font-size:44px; font-weight:700; line-height:1.1; margin:6px 0; font-variant-numeric:tabular-nums; }
+  .bull { color:var(--bull); } .bear { color:var(--bear); } .neu { color:var(--neu); }
+  .badge { display:inline-block; padding:2px 8px; border-radius:999px; border:1px solid currentColor; font-size:12px; }
+  .chip { display:inline-block; padding:1px 7px; border-radius:4px; background:#21262d; color:var(--mute); font-size:11px; margin-left:6px; }
+  .chip.warn { color:var(--warn); } .chip.bad { color:var(--bear); }
+  .drivers { margin:8px 0 0; padding:0; list-style:none; font-size:12.5px; }
+  .drivers li { display:flex; justify-content:space-between; gap:8px; padding:2px 0; border-top:1px solid var(--line); }
+  .small { color:var(--mute); font-size:12px; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px; }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  th,td { text-align:left; padding:5px 6px; border-top:1px solid var(--line); vertical-align:top; }
+  th { color:var(--mute); font-weight:600; border-top:0; }
+  td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .scroll { overflow-x:auto; }
+  .bars { display:grid; grid-template-columns:minmax(120px,1.1fr) 3fr 56px; gap:6px 10px; align-items:center; font-size:12.5px; }
+  .track { position:relative; height:14px; background:#0f141a; border-radius:3px; }
+  .track::after { content:""; position:absolute; left:50%; top:0; bottom:0; width:1px; background:var(--line); }
+  .fill { position:absolute; top:2px; bottom:2px; border-radius:2px; }
+  ul.plain { margin:4px 0 0; padding-left:18px; } ul.plain li { margin:3px 0; }
+  .cols { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px; }
+  svg { max-width:100%; }
+  @media (max-width:600px) { .score { font-size:38px; } .wrap { padding:10px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>MACRO DAILY BIAS TERMINAL</h1>
+    <button id="refresh">Obnoviť dáta</button>
+  </header>
+  <div class="meta" id="meta"></div>
+  <div id="banners"></div>
+  <div class="cards" id="cards"></div>
+  <div id="detail"></div>
+  <h2>Kalendár katalyzátorov (30 dní)</h2>
+  <div class="panel scroll" id="calendar"></div>
+  <h2>Zdroje dát a ich stav</h2>
+  <div class="panel scroll" id="sources"></div>
+  <p class="small">Skóre je makroekonomické hodnotenie z verejných denných/mesačných dát, nie obchodný signál a nie real-time. Váhy modelu sú hypotézy, ešte neoverené históriou.</p>
+  <p class="small">Zdroje: FRED® (Federal Reserve Bank of St. Louis) a ECB Data Portal (© European Central Bank). This product uses the FRED® API but is not endorsed or certified by the Federal Reserve Bank of St. Louis. Hodnoty sérií © CBOE a © ICE BofA sa nezverejňujú.</p>
+</div>
+<!--STATIC-CONFIG-->
+<script>
+"use strict";
+const CLS = { strong_bearish:["Silno medvedí","bear"], bearish:["Medvedí","bear"], neutral:["Neutrálne","neu"], bullish:["Býčie","bull"], strong_bullish:["Silno býčie","bull"] };
+const STATUS = { normal:["Normálne",""], provisional:["Provizórne","warn"], insufficient:["Nedostatok dát","bad"] };
+const HEALTH = { ok:"OK", degraded:"Čiastočne", down:"Nedostupný", unconfigured:"Nenastavený" };
+const STATE = { ok:"aktuálne", stale:"zastarané", expired:"vypršané", missing:"chýba" };
+let selected = "GC", cache = null;
+
+function h(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) { if (k === "class") e.className = v; else if (k.startsWith("on")) e[k] = v; else e.setAttribute(k, v); }
+  for (const c of kids.flat()) if (c != null) e.append(c.nodeType ? c : document.createTextNode(String(c)));
+  return e;
+}
+const sg = (x, d = 1) => (x >= 0 ? "+" : "") + x.toFixed(d);
+const fmtLocal = (iso) => iso ? new Date(iso).toLocaleString("sk-SK", { timeZone: "Europe/Bratislava", dateStyle: "short", timeStyle: "short" }) : "—";
+const clsOf = (s) => s == null ? "neu" : s >= 0.05 ? "bull" : s <= -0.05 ? "bear" : "neu";
+function usSession() {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short", hour: "numeric", minute: "numeric", hour12: false }).formatToParts(new Date()).map(x => [x.type, x.value]));
+  const t = (parseInt(p.hour, 10) % 24) * 60 + parseInt(p.minute, 10);
+  if (p.weekday === "Sat" || p.weekday === "Sun") return "víkend (cash session zatvorená)";
+  if (t >= 570 && t < 960) return "cash session USA otvorená";
+  if (t >= 240 && t < 570) return "pred otvorením USA";
+  return "po zatvorení USA";
+}
+const STATIC = !!window.MB_STATIC;
+function staticPath(path) {
+  if (path.startsWith("/api/bias/current")) return "data/current.json";
+  const m = path.match(/^\/api\/bias\/([^/]+)\/history/); if (m) return "data/history-" + m[1] + ".json";
+  if (path.startsWith("/api/providers/status")) return "data/status.json";
+  if (path.startsWith("/api/calendar/upcoming")) return "data/calendar.json";
+  throw new Error("V statickom režime nedostupné: " + path);
+}
+async function api(path, opts) {
+  const url = STATIC ? staticPath(path) + "?t=" + Math.floor(Date.now() / 60000) : path;
+  const r = await fetch(url, opts); if (!r.ok) throw new Error(path + " → " + r.status); return r.json();
+}
+
+function latestInputDate(b) { let d = null; for (const f of b.factors) for (const i of f.inputs) if (!d || i.date > d) d = i.date; return d; }
+
+function renderCards() {
+  const box = document.getElementById("cards"); box.replaceChildren();
+  for (const a of cache.assets) {
+    const b = a.bias, ok = b.displayedScore != null;
+    const [cl, cc] = ok ? CLS[b.classification] : ["Bez skóre", "neu"];
+    const top = b.factors.filter(f => f.available).sort((x, y) => Math.abs(y.contribution) - Math.abs(x.contribution)).slice(0, 3);
+    const [st, stc] = STATUS[b.status];
+    box.append(h("div", { class: "card" + (a.symbol === selected ? " sel" : ""), onclick: () => { selected = a.symbol; renderCards(); renderDetail(); } },
+      h("div", { class: "top" }, h("span", { class: "sym" }, a.name), h("span", { class: "chip " + stc }, st)),
+      h("div", { class: "score " + cc }, ok ? sg(b.displayedScore) : "—"),
+      h("div", {}, h("span", { class: "badge " + cc }, cl), h("span", { class: "chip" }, "Istota " + (b.confidence ?? "—") + (b.confidence != null ? "/100" : ""))),
+      h("ul", { class: "drivers" }, top.length ? top.map(f => h("li", {}, h("span", {}, f.label), h("span", { class: clsOf(f.contribution) }, sg(f.contribution, 2)))) : h("li", {}, "Žiadne dostupné faktory")),
+      h("div", { class: "small", style: "margin-top:8px" }, "Posledné dáta: " + (latestInputDate(b) ?? "—") + " · Prepočítané: " + fmtLocal(b.calculatedAt))));
+  }
+}
+
+function spark(points) {
+  const pts = points.filter(p => p.displayed_score != null);
+  if (pts.length < 2) return h("div", { class: "small" }, "História: zatiaľ málo uložených snapshotov (" + pts.length + "). Graf sa plní skutočnými uloženými hodnotami, nič sa nedopočítava.");
+  const W = 640, H = 120, P = 6, ys = pts.map(p => p.displayed_score);
+  const x = i => P + i * (W - 2 * P) / (pts.length - 1), y = v => H / 2 - (v / 10) * (H / 2 - P);
+  const ns = "http://www.w3.org/2000/svg", s = document.createElementNS(ns, "svg");
+  s.setAttribute("viewBox", `0 0 ${W} ${H}`); s.setAttribute("width", "100%");
+  const mk = (t, a) => { const e = document.createElementNS(ns, t); for (const k in a) e.setAttribute(k, a[k]); s.append(e); return e; };
+  mk("line", { x1: 0, x2: W, y1: H / 2, y2: H / 2, stroke: "#262d37" });
+  mk("polyline", { points: pts.map((p, i) => x(i) + "," + y(p.displayed_score)).join(" "), fill: "none", stroke: "#58a6ff", "stroke-width": 2 });
+  const t = mk("text", { x: W - P, y: 12, fill: "#8b949e", "font-size": 11, "text-anchor": "end" }); t.textContent = pts.length + " snapshotov, " + sg(Math.min(...ys)) + " … " + sg(Math.max(...ys));
+  return s;
+}
+
+async function renderDetail() {
+  const box = document.getElementById("detail"); box.replaceChildren();
+  const a = cache.assets.find(x => x.symbol === selected); if (!a) return;
+  const b = a.bias, ex = a.explanation;
+  let hist = { points: [] };
+  try { hist = await api("/api/bias/" + a.symbol + "/history?limit=300"); } catch (e) { /* leave empty */ }
+
+  const bars = h("div", { class: "bars" });
+  for (const f of b.factors) {
+    const c = f.available ? f.contribution : null, mx = 10 * Math.max(...b.factors.map(x => x.weight));
+    const w = c == null ? 0 : Math.min(Math.abs(c) / mx, 1) * 50;
+    const fill = h("div", { class: "fill", style: `background:${c == null ? "transparent" : c >= 0 ? "var(--bull)" : "var(--bear)"};${c != null && c >= 0 ? "left:50%;" : "right:50%;"}width:${w}%` });
+    bars.append(h("div", {}, f.label), h("div", { class: "track" }, fill), h("div", { class: "num " + clsOf(c) }, c == null ? "n/a" : sg(c, 2)));
+  }
+  const rows = b.factors.map(f => h("tr", {},
+    h("td", {}, f.label), h("td", { class: "num" }, (f.weight * 100).toFixed(0) + " %"),
+    h("td", { class: "num" }, f.available ? sg(f.z, 2) : "n/a"), h("td", { class: "num" }, f.available ? sg(f.score, 1) : "n/a"),
+    h("td", { class: "num" }, f.available ? sg(f.contribution, 2) : "n/a"), h("td", { class: "num" }, f.available ? Math.round(f.freshness * 100) + " %" : "—"),
+    h("td", { class: "small" }, f.inputs.map(i => i.indicator + " " + i.date).join(", ") || "žiadny dostupný vstup")));
+  const list = (items, empty) => h("ul", { class: "plain" }, items.length ? items.map(t => h("li", {}, t)) : h("li", { class: "small" }, empty));
+
+  box.append(h("h2", {}, a.name + " — detail"),
+    h("div", { class: "panel" }, h("p", { style: "margin-top:0" }, ex.summary),
+      h("div", { class: "small" }, "Režim: " + b.regime + " (istota režimu " + Math.round(b.regimeCertainty * 100) + " %) · " + b.regimeReasons.join(" · ")),
+      h("div", { class: "small" }, "Pokrytie: " + Math.round(b.coverage * 100) + " % · verzia modelu " + b.version + " · raw " + (b.rawScore == null ? "—" : b.rawScore.toFixed(3)))),
+    h("h2", {}, "Príspevky faktorov"), h("div", { class: "panel" }, bars),
+    h("h2", {}, "Rozpis faktorov"), h("div", { class: "panel scroll" }, h("table", {}, h("thead", {}, h("tr", {}, ["Faktor", "Váha", "z", "Skóre", "Príspevok", "Aktuálnosť", "Vstupy"].map((t, i) => h("th", { class: i > 0 && i < 6 ? "num" : "" }, t)))), h("tbody", {}, rows))),
+    h("div", { class: "cols" },
+      h("div", { class: "panel" }, h("b", {}, "Býčie faktory"), list(ex.bullish, "Žiadne")),
+      h("div", { class: "panel" }, h("b", {}, "Medvedie faktory"), list(ex.bearish, "Žiadne")),
+      h("div", { class: "panel" }, h("b", {}, "Protichodné signály"), list(ex.conflicts, "Žiadne výrazné rozpory")),
+      h("div", { class: "panel" }, h("b", {}, "Čo by skóre zmenilo"), list(ex.invalidation, "—")),
+      h("div", { class: "panel" }, h("b", {}, "Najbližšie katalyzátory"), list(ex.catalysts, "Žiadne v kalendári na 14 dní")),
+      h("div", { class: "panel" }, h("b", {}, "Istota"), h("p", { class: "small" }, ex.confidence))),
+    h("h2", {}, "Obmedzenia a poznámky"), h("div", { class: "panel" }, list(ex.caveats, "—")),
+    h("h2", {}, "História skóre (uložené snapshoty)"), h("div", { class: "panel" }, spark(hist.points)));
+}
+
+async function renderSides() {
+  const [cal, src] = await Promise.all([api("/api/calendar/upcoming"), api("/api/providers/status")]);
+  const c = document.getElementById("calendar"); c.replaceChildren();
+  c.append(cal.events.length ? h("table", {}, h("thead", {}, h("tr", {}, ["Dátum", "Udalosť", "Typ", "Dôležitosť", "Zdroj"].map(t => h("th", {}, t)))),
+    h("tbody", {}, cal.events.map(e => h("tr", {}, h("td", {}, e.date), h("td", {}, e.name), h("td", {}, e.kind), h("td", {}, e.importance === "high" ? "vysoká" : "stredná"), h("td", { class: "small" }, e.origin === "STATIC" ? "manuálny zoznam (overené 15. 10. 2026)" : "FRED kalendár vydaní"))))) : h("div", { class: "small" }, "Žiadne udalosti. Kalendár vydaní vyžaduje FRED_API_KEY."));
+  const s = document.getElementById("sources"); s.replaceChildren();
+  const ph = src.providers.map(p => h("span", { class: "chip " + (p.health === "ok" ? "" : p.health === "degraded" ? "warn" : "bad") }, p.provider + ": " + (HEALTH[p.health] || p.health)));
+  s.append(h("div", { style: "margin-bottom:8px" }, ph.length ? ph : h("span", { class: "small" }, "Zatiaľ nebol žiadny pokus o načítanie. Stlač „Obnoviť dáta“.")),
+    h("table", {}, h("thead", {}, h("tr", {}, ["Ukazovateľ", "Zdroj", "Frekvencia", "Posledný údaj", "Vek", "Stav", "Poznámka / chyba"].map(t => h("th", {}, t)))),
+      h("tbody", {}, src.indicators.map(i => h("tr", {}, h("td", {}, i.name + (i.scoring ? "" : " (kontext)")), h("td", {}, i.provider + " " + i.ref), h("td", {}, i.frequency),
+        h("td", {}, i.lastDate ? i.lastDate + (i.lastValue == null ? " (hodnota nezverejnená)" : " (" + (+i.lastValue.toFixed(3)) + " " + i.unit + ")") : "—"), h("td", {}, i.ageDays == null ? "—" : i.ageDays + " d"),
+        h("td", { class: i.state === "ok" ? "" : i.state === "stale" ? "bear" : "bear" }, STATE[i.state]), h("td", { class: "small" }, i.lastError || i.note || ""))))));
+  if (src.events.length) s.append(h("div", { class: "small", style: "margin-top:8px" }, "Posledná udalosť systému: " + fmtLocal(src.events[0].occurred_at) + " — " + src.events[0].message));
+}
+
+async function load() {
+  cache = await api("/api/bias/current");
+  document.getElementById("meta").replaceChildren(
+    h("span", {}, "Čas (Bratislava): ", h("b", {}, new Date().toLocaleString("sk-SK", { timeZone: "Europe/Bratislava" }))),
+    h("span", {}, "USA: ", h("b", {}, usSession())),
+    h("span", {}, "Posledný refresh dát: ", h("b", {}, fmtLocal(cache.lastRefreshAt))),
+    h("span", {}, "Režim dát: ", h("b", {}, "denné/mesačné, nie real-time")),
+    STATIC ? h("span", {}, "Automatická aktualizácia: ", h("b", {}, "pracovné dni 3× (ráno, po vydaní dát z USA, večer)")) : null);
+  const bn = document.getElementById("banners"); bn.replaceChildren();
+  if (!cache.fredConfigured) bn.append(h("div", { class: "banner" }, STATIC
+    ? "Chýba FRED_API_KEY v GitHub Secrets: dáta z USA sa nenačítajú, skóre bude „Nedostatok dát“."
+    : "Chýba FRED_API_KEY: dáta z USA sa nenačítajú, skóre bude „Nedostatok dát“. Kľúč je zadarmo (fredaccount.stlouisfed.org/apikeys) — vlož ho do súboru .env a reštartuj server."));
+  if (!cache.lastRefreshAt) bn.append(h("div", { class: "banner" }, "Dáta sa ešte nenačítali. Stlač „Obnoviť dáta“."));
+  if (STATIC && cache.lastRefreshAt) {
+    const hrs = (Date.now() - Date.parse(cache.lastRefreshAt)) / 3600000;
+    if (hrs > 30) bn.append(h("div", { class: "banner" }, "Stránka nebola aktualizovaná " + Math.floor(hrs) + " hodín. Automatická aktualizácia mohla zlyhať — skontroluj GitHub Actions."));
+  }
+  renderCards(); await renderDetail(); await renderSides();
+}
+
+if (STATIC) {
+  // On the public site a refresh means running the GitHub workflow (takes ~2 minutes).
+  const btn = document.getElementById("refresh");
+  if (window.MB_REPO) {
+    const a = h("a", { href: "https://github.com/" + window.MB_REPO + "/actions/workflows/update.yml", target: "_blank", rel: "noopener", style: "color:var(--text)" }, h("button", { type: "button" }, "Obnoviť dáta (GitHub)"));
+    btn.replaceWith(a);
+  } else btn.hidden = true;
+}
+if (!STATIC) document.getElementById("refresh").onclick = async (ev) => {
+  const btn = ev.target; btn.disabled = true; btn.textContent = "Načítavam…";
+  try { await api("/api/refresh", { method: "POST", headers: { "X-Requested-With": "macro-bias" } }); } catch (e) { alert("Obnovenie zlyhalo: " + e.message); }
+  btn.disabled = false; btn.textContent = "Obnoviť dáta"; load().catch(console.error);
+};
+load().catch(e => { document.getElementById("banners").append(h("div", { class: "banner" }, "Chyba načítania: " + e.message)); });
+setInterval(() => load().catch(console.error), 60000);
+</script>
+</body>
+</html>

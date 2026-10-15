@@ -1,0 +1,17 @@
+{
+  "name": "macro-bias",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Macro Daily Bias Terminal — free, local, deterministic macro bias for NQ, Gold and EUR/USD",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env src/server.ts",
+    "refresh": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env src/cli.ts refresh",
+    "check-sources": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env src/cli.ts check-sources",
+    "test": "node --disable-warning=ExperimentalWarning --test \"tests/*.test.ts\"",
+    "build-site": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env src/build-site.ts"
+  }
+}

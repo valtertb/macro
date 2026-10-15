@@ -1,0 +1,99 @@
+import { INDICATORS, STATIC_CALENDAR, WATCHED_RELEASES } from "./config.ts";
+import type { IndicatorDef } from "./config.ts";
+import { lastObsDate, logEvent, replaceCalendar, setIndicatorStatus, setProviderStatus, upsertObservations } from "./db.ts";
+import type { Db } from "./db.ts";
+import { redact } from "./http.ts";
+import { fetchEcbSeries } from "./providers/ecb.ts";
+import { fetchFredReleaseDates, fetchFredSeries } from "./providers/fred.ts";
+import type { ReleaseDate } from "./providers/fred.ts";
+import type { Obs } from "./types.ts";
+
+export interface IngestDeps {
+  fetchFred?: (id: string, key: string, start: string) => Promise<Obs[]>;
+  fetchEcb?: (def: IndicatorDef, start: string) => Promise<Obs[]>;
+  fetchReleases?: (key: string, from: string, to: string) => Promise<ReleaseDate[]>;
+}
+
+export interface IngestReport {
+  ok: string[];
+  failed: { code: string; error: string }[];
+  skipped: string[];
+  providers: Record<string, string>;
+}
+
+const addDays = (iso: string, n: number) => new Date(Date.parse(iso + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
+
+function startFor(db: Db, def: IndicatorDef): string {
+  const last = lastObsDate(db, def.code);
+  if (!last) return def.historyStart;
+  // Re-fetch a recent window so provider revisions are detected.
+  const back = def.frequency === "monthly" ? 400 : 45;
+  const s = addDays(last, -back);
+  return s > def.historyStart ? s : def.historyStart;
+}
+
+export async function ingestAll(db: Db, env: Record<string, string | undefined>, now: Date = new Date(), deps: IngestDeps = {}): Promise<IngestReport> {
+  const at = now.toISOString();
+  const fred = deps.fetchFred ?? ((id, key, start) => fetchFredSeries(id, key, start));
+  const ecb = deps.fetchEcb ?? ((def, start) => fetchEcbSeries(def.ref, def.frequency, start));
+  const releases = deps.fetchReleases ?? ((key, from, to) => fetchFredReleaseDates(key, from, to));
+  const report: IngestReport = { ok: [], failed: [], skipped: [], providers: {} };
+  const key = env.FRED_API_KEY?.trim();
+
+  const counts: Record<string, { ok: number; fail: number; err?: string }> = { FRED: { ok: 0, fail: 0 }, ECB: { ok: 0, fail: 0 } };
+
+  for (const def of INDICATORS.filter((i) => i.provider !== "DERIVED")) {
+    const c = counts[def.provider];
+    if (def.provider === "FRED" && !key) {
+      report.skipped.push(def.code);
+      setIndicatorStatus(db, def.code, at, "Chýba FRED_API_KEY (zadarmo: fredaccount.stlouisfed.org/apikeys)");
+      continue;
+    }
+    try {
+      const start = startFor(db, def);
+      const obs = def.provider === "FRED" ? await fred(def.ref, key as string, start) : await ecb(def, start);
+      if (!obs.length && !lastObsDate(db, def.code)) throw new Error("Zdroj nevrátil žiadne pozorovania");
+      const r = upsertObservations(db, def.code, def.provider, obs, at);
+      setIndicatorStatus(db, def.code, at, null);
+      if (r.revised) logEvent(db, "info", "ingest", `${def.code}: zrevidovaných ${r.revised} hodnôt`, at);
+      report.ok.push(def.code);
+      c.ok++;
+    } catch (e) {
+      const msg = redact(e instanceof Error ? e.message : String(e));
+      report.failed.push({ code: def.code, error: msg });
+      setIndicatorStatus(db, def.code, at, msg);
+      logEvent(db, "warn", "ingest", `${def.code}: ${msg}`, at);
+      c.fail++;
+      c.err = msg;
+    }
+  }
+
+  for (const p of ["FRED", "ECB"] as const) {
+    const c = counts[p];
+    let health: string;
+    let detail: string | null = null;
+    if (p === "FRED" && !key) { health = "unconfigured"; detail = "Chýba FRED_API_KEY"; }
+    else if (c.fail === 0) health = "ok";
+    else if (c.ok === 0) { health = "down"; detail = c.err ?? null; }
+    else { health = "degraded"; detail = `${c.fail} zlyhaní, posledná chyba: ${c.err}`; }
+    setProviderStatus(db, p, health, detail, at);
+    report.providers[p] = health;
+  }
+
+  // Calendar: static central-bank dates + FRED release dates (the latter needs a key and may fail without breaking scoring).
+  replaceCalendar(db, "STATIC", STATIC_CALENDAR.map((e) => ({ date: e.date, name: e.name, kind: e.kind, importance: e.importance, url: e.source })));
+  if (key) {
+    try {
+      const today = at.slice(0, 10);
+      const rd = await releases(key, today, addDays(today, 45));
+      const events = rd.flatMap((r) => {
+        const w = WATCHED_RELEASES.find((x) => r.name.toLowerCase().includes(x.match.toLowerCase()));
+        return w ? [{ date: r.date, name: w.label, kind: "DATA", importance: w.importance, url: "https://fred.stlouisfed.org/releases/calendar" }] : [];
+      });
+      replaceCalendar(db, "FRED_RELEASES", events);
+    } catch (e) {
+      logEvent(db, "warn", "calendar", `Kalendár vydaní FRED zlyhal: ${redact(e instanceof Error ? e.message : String(e))}`, at);
+    }
+  }
+  return report;
+}
