@@ -1,1 +1,35 @@
-{}
+{
+ "NQ": [
+  {
+   "calculated_at": "2026-10-15T10:07:06.240Z",
+   "displayed_score": null,
+   "classification": null,
+   "confidence": null,
+   "status": "insufficient",
+   "input_hash": "c77ea47484991a45766e9f0c6013fea6cea7d12d",
+   "version": "mvp-0.1.0"
+  }
+ ],
+ "GC": [
+  {
+   "calculated_at": "2026-10-15T10:07:06.240Z",
+   "displayed_score": null,
+   "classification": null,
+   "confidence": null,
+   "status": "insufficient",
+   "input_hash": "a72bb9d7bf9a9438cce75e06f94a4e2b3813ca8f",
+   "version": "mvp-0.1.0"
+  }
+ ],
+ "EURUSD": [
+  {
+   "calculated_at": "2026-10-15T10:07:06.240Z",
+   "displayed_score": null,
+   "classification": null,
+   "confidence": null,
+   "status": "insufficient",
+   "input_hash": "90eadedb0ea079d915ad6b4c723c789857863bea",
+   "version": "mvp-0.1.0"
+  }
+ ]
+}
