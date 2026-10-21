@@ -107,6 +107,15 @@
    "status": "normal",
    "input_hash": "20b18d4873c456f384da1c89996cfc775f31c320",
    "version": "mvp-0.1.0"
+  },
+  {
+   "calculated_at": "2026-10-21T21:42:59.064Z",
+   "displayed_score": null,
+   "classification": null,
+   "confidence": null,
+   "status": "insufficient",
+   "input_hash": "c77ea47484991a45766e9f0c6013fea6cea7d12d",
+   "version": "mvp-0.1.0"
   }
  ],
  "GC": [
@@ -216,6 +225,15 @@
    "confidence": 85,
    "status": "normal",
    "input_hash": "a6db5b4aae05d78f24fe6e925a06ef1fefb19f45",
+   "version": "mvp-0.1.0"
+  },
+  {
+   "calculated_at": "2026-10-21T21:42:59.064Z",
+   "displayed_score": null,
+   "classification": null,
+   "confidence": null,
+   "status": "insufficient",
+   "input_hash": "a72bb9d7bf9a9438cce75e06f94a4e2b3813ca8f",
    "version": "mvp-0.1.0"
   }
  ],
@@ -371,6 +389,15 @@
    "confidence": 85,
    "status": "normal",
    "input_hash": "bd0ce3aa8832e93f8f574803a8dac27156b3281a",
+   "version": "mvp-0.1.0"
+  },
+  {
+   "calculated_at": "2026-10-21T21:42:59.064Z",
+   "displayed_score": null,
+   "classification": null,
+   "confidence": null,
+   "status": "insufficient",
+   "input_hash": "487af8f385c274f8f5a37d62faf4b3f3a861a24b",
    "version": "mvp-0.1.0"
   }
  ]
