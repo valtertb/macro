@@ -426,6 +426,15 @@
    "status": "normal",
    "input_hash": "7b1d006996d56f63516ed123f59a05e3319b2dff",
    "version": "mvp-0.1.0"
+  },
+  {
+   "calculated_at": "2026-10-22T11:45:20.250Z",
+   "displayed_score": -1.6,
+   "classification": "neutral",
+   "confidence": 91,
+   "status": "normal",
+   "input_hash": "23dd68da2764fe88abbe5d0622c189794c3ea631",
+   "version": "mvp-0.1.0"
   }
  ]
 }
