@@ -489,6 +489,15 @@
    "status": "normal",
    "input_hash": "8c367298d98efb6870d128d9bc6671652acf58f0",
    "version": "mvp-0.1.0"
+  },
+  {
+   "calculated_at": "2026-10-23T11:45:59.717Z",
+   "displayed_score": 0.7,
+   "classification": "neutral",
+   "confidence": 81,
+   "status": "normal",
+   "input_hash": "b55c1b7bcc9e9206049ae2d640bd514142356e09",
+   "version": "mvp-0.1.0"
   }
  ]
 }
