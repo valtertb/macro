@@ -188,6 +188,15 @@
    "status": "normal",
    "input_hash": "ebf79d86787e8efbdf31458290638c2913b705d4",
    "version": "mvp-0.1.0"
+  },
+  {
+   "calculated_at": "2026-10-27T21:43:00.705Z",
+   "displayed_score": -1.2,
+   "classification": "neutral",
+   "confidence": 83,
+   "status": "normal",
+   "input_hash": "fadb8a2c08c2c6a34fddcd0e0f9b974f802d17a2",
+   "version": "mvp-0.1.0"
   }
  ],
  "GC": [
@@ -378,6 +387,15 @@
    "confidence": 78,
    "status": "normal",
    "input_hash": "09fdf961779973470cc6c36b7e69dc938b0697d6",
+   "version": "mvp-0.1.0"
+  },
+  {
+   "calculated_at": "2026-10-27T21:43:00.705Z",
+   "displayed_score": -0.6,
+   "classification": "neutral",
+   "confidence": 82,
+   "status": "normal",
+   "input_hash": "7ff5ec05f6628ad7355fe05e99333070022a87ab",
    "version": "mvp-0.1.0"
   }
  ],
@@ -650,6 +668,15 @@
    "confidence": 77,
    "status": "normal",
    "input_hash": "fd1909a600b06bff78cc477e72a3b1ebff26a93c",
+   "version": "mvp-0.1.0"
+  },
+  {
+   "calculated_at": "2026-10-27T21:43:00.705Z",
+   "displayed_score": -0.4,
+   "classification": "neutral",
+   "confidence": 77,
+   "status": "normal",
+   "input_hash": "69533cb261daed67fd24d9f35e3cfece15b4a192",
    "version": "mvp-0.1.0"
   }
  ]
